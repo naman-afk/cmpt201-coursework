@@ -1,0 +1,33 @@
+#define _POSIX_C_SOURCE 200809L
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void) {
+  // inputptr will point to a new buffer containing what the user typed
+  char *inputptr = NULL;
+  size_t p = 0;
+
+  // getline needs to change inputptr and size_t so we give address
+  printf("Input your text here: ");
+  ssize_t input = getline(&inputptr, &p, stdin);
+
+  // Error
+  if (input == -1) {
+    exit(EXIT_FAILURE);
+  }
+
+  // saveptr is mark to remember where strtok_r left off (last string)
+  char *saveptr;
+  char *token = strtok_r(inputptr, " ", &saveptr);
+
+  while (token != NULL) {
+    printf("%s\n", token);
+    token =
+        strtok_r(NULL, " ",
+                 &saveptr); // NULL here says to not start from beginning again
+  }
+
+  free(inputptr); // getline allocated memory
+  return 0;
+}
