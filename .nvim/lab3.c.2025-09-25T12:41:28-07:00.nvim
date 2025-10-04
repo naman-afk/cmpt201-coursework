@@ -1,0 +1,78 @@
+#define _GNU_SOURCE
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define HISTORY_SIZE 5
+
+static void free_history(char *history[]) {
+  for (int i = 0; i < HISTORY_SIZE; i++) {
+    if (history[i] != NULL) {
+      free(history[i]);
+      history[i] = NULL;
+    }
+  }
+}
+
+static void add_to_history(const char *line, char *history[], int *current,
+                           int *count) {
+  char *copy = strdup(line);
+  if (copy == NULL) {
+    fprintf(stderr, "Error: failed to allocate memory for history entry. \n");
+    return;
+  }
+  if (history[*current] != NULL) {
+    free(history[*current]);
+  }
+  history[*current] = copy;
+
+  *current = (*current + 1) % HISTORY_SIZE;
+
+  if (*count < HISTORY_SIZE) {
+
+    (*count)++;
+  }
+}
+
+static void print_history(char *history[], int count, int current) {
+  int to_print = count < HISTORY_SIZE ? count : HISTORY_SIZE;
+
+  int start = (count < HISTORY_SIZE) ? 0: current;
+
+  for (int i = 0; i < to_print; i++) {
+    int idx = (start + i) % HISTORY_SIZE;
+    if (history[idx] != NULL) {
+      fputs(history[idx], stdout);
+    }
+  }
+}
+
+int main(void) {
+  char *history[HISTORY_SIZE] = {NULL};
+  int current = 0;
+  int count = 0;
+
+  char *line = NULL;
+  size_t cap = 0;
+
+  while (true) {
+    printf("Input: ");
+
+    ssize_t nread = getline(&line, &cap, stdin);
+
+    if (nread == -1) {
+      putchar('\n');
+      break;
+    }
+
+    if (strcmp(line, "print\n") == 0) {
+      print_history(history, count, current);
+    } else {
+      add_to_history(line, history, &current, &count);
+    }
+  }
+  free_history(history);
+  free(line);
+  return 0;
+}

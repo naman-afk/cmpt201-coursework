@@ -1,0 +1,104 @@
+#define _GNU_SOURCE
+#include <errno.h>
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BUF_SIZE 256
+
+struct header {
+  uint64_t size;
+  struct header *next;
+}; static void handle_error(const char *msg) {
+  char buf[BUF_SIZE];
+  int n = snprintf(buf, BUF_SIZE, "Error: %s (errno=%d)\n", msg, errno);
+  if (n > 0)
+    write(STDOUT_FILENO, buf, (size_t)n);
+  _exit(1);
+}
+
+void print_out(char *format, void *data, size_t data_size) {
+  char buf[BUF_SIZE];
+  ssize_t len = snprintf(buf, BUF_SIZE, format,
+                         data_size == sizeof(uint64_t) ? *(uint64_t *)data
+                                                      :(uintptr_t)(* (void **)data));
+  if (len < 0) {
+    handle_error("snprintf");
+  }
+  write(STDOUT_FILENO, buf, (size_t)len);
+}
+
+static void print_ptr_label(const char *label, void *ptr) {
+  char line[BUF_SIZE];
+  int n = snprintf(line, BUF_SIZE, "%s %p\n", label, ptr);
+  if (n > 0)
+    write(STDOUT_FILENO, line, (size_t)n);
+}
+
+static void print_u64_label(const char *label, uint64_t value) {
+  char line[BUF_SIZE];
+  int n = snprintf(line, BUF_SIZE, "%s %" PRIu64 "\n", label, value);
+  if (n > 0)
+    write(STDOUT_FILENO, line, (size_t)n);
+}
+
+static void print_byte(uint8_t b) {
+  uint64_t v = (uint64_t)b;
+  char line[BUF_SIZE];
+  int n = snprintf(line, BUF_SIZE, "%" PRIu64 "\n", v);
+  if (n > 0)
+    write(STDOUT_FILENO, line, (size_t)n);
+}
+
+int main(void) {
+  const uint64_t BLOCK_SIZE = 128;
+  const uint64_t TOTAL_SIZE = 256;
+
+  void *base = sbrk((intptr_t)TOTAL_SIZE);
+  if (base == (void *)-1) {
+    handle_error("srbk");
+  }
+
+  struct header *first = (struct header *)base;
+  struct header *second = (struct header *)((uint8_t *)base + BLOCK_SIZE);
+
+  first->size = BLOCK_SIZE;
+  first->next = NULL;
+  second->size = BLOCK_SIZE;
+  second->next = first;
+
+  print_ptr_label("first block:", (void *)first);
+  print_ptr_label("second block:", (void *)second);
+
+  print_u64_label("first block size:", first->size);
+  print_ptr_label("first block next:", (void *)first->next);
+
+  print_u64_label("second block size:", second->size);
+  print_ptr_label("second block next:", (void *)second->next);
+
+  uint64_t header_size = (uint64_t)sizeof(struct header);
+  uint64_t data_size = BLOCK_SIZE - header_size;
+
+  uint8_t *first_data = (uint8_t *)first + header_size;
+  uint8_t *second_data = (uint8_t *)second + header_size;
+
+  memset(first_data, 0, (size_t)data_size);
+  memset(second_data, 1, (size_t)data_size);
+
+  print_u64_label("first block size:", first->size);
+  print_ptr_label("first block next:", (void *)first->next);
+
+  print_u64_label("second block size:", second->size);
+  print_ptr_label("second block next:", (void *)second->next);
+
+  for (uint64_t i = 0; i < data_size; i++) {
+    print_byte(first_data[i]);
+  }
+  for (uint64_t i = 0; i < data_size; i++) {
+    print_byte(second_data[i]);
+  }
+  return 0;
+}
